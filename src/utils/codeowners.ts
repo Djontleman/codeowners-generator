@@ -57,6 +57,8 @@ export const generateOwnersFile = async (
   if (fs.existsSync(outputFile)) {
     debug(`output file ${outputFile} exists, extracting content before overwriting`);
     originalContent = await readContent(outputFile);
+  } else {
+    preserveBlockPosition = false;
   }
 
   let content = [] as string[];
