@@ -41,6 +41,10 @@ const filterGeneratedContent = (content: string): [withoutGeneratedCode: string[
     return skip ? memo : [...memo, line];
   }, [] as string[]);
 
+  // if (generatedBlockPosition === -1) {
+  //   generatedBlockPosition = withoutGeneratedCode.length - 1;
+  // }
+
   return [withoutGeneratedCode, generatedBlockPosition];
 };
 
@@ -56,7 +60,8 @@ export const generateOwnersFile = async (
 
   if (fs.existsSync(outputFile)) {
     debug(`output file ${outputFile} exists, extracting content before overwriting`);
-    originalContent = (await readContent(outputFile)).concat('\n');
+    // originalContent = (await readContent(outputFile)).concat('\n');
+    originalContent = await readContent(outputFile);
   } else {
     preserveBlockPosition = false;
   }
@@ -75,26 +80,40 @@ export const generateOwnersFile = async (
   }
   const [withoutGeneratedCode, blockPosition] = filterGeneratedContent(originalContent);
 
+  console.log({ withoutGeneratedCode, blockPosition });
+
   let normalizedContent = '';
+  let includesGeneratedContent = false;
+  let contentBeforeGeneratedBlock = false;
 
   const generatedContent = generatedContentTemplate(content.join('\n'), customRegenerationCommand) + '\n';
+
+  // console.log({ originalContent })
 
   if (originalContent) {
     normalizedContent = withoutGeneratedCode.reduce((memo, line, index) => {
       if (preserveBlockPosition && index === blockPosition) {
-        memo += generatedContent;
+        memo += (contentBeforeGeneratedBlock ? '\n' : '') + generatedContent;
+        includesGeneratedContent = true;
       }
-      memo += line + '\n';
+      memo += line + (index === withoutGeneratedCode.length - 1 ? '' : '\n');
+
+      if (!includesGeneratedContent && line.trim() !== '') {
+        contentBeforeGeneratedBlock = true;
+      } else {
+        contentBeforeGeneratedBlock = false;
+      }
+      // console.log({ memo, line, index })
 
       return memo;
     }, '');
   }
 
-  if (!preserveBlockPosition) {
-    normalizedContent = normalizedContent + generatedContent;
+  if (!includesGeneratedContent) {
+    normalizedContent = normalizedContent + generatedContent.trimEnd();
   }
 
-  return [originalContent, normalizedContent.trimEnd()];
+  return [originalContent, normalizedContent];
 };
 
 const parseCodeOwner = (filePath: string, codeOwnerContent: string): ownerRule[] => {
